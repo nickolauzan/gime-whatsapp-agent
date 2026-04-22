@@ -67,7 +67,7 @@ exports.handler = async function handler(event) {
         profileName: message.profileName
       });
       
-      console.log("OpenAI response:", response);
+      console.log("OpenAI reply:", reply);
       console.log("sending reply to WhatsApp...");
       
       await sendWhatsAppText({
