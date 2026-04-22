@@ -8,6 +8,13 @@ const {
 } = require("./lib/whatsapp");
 
 exports.handler = async function handler(event) {
+  console.log("=== WHATSAPP WEBHOOK HIT ===");
+  console.log("method:", event.httpMethod);
+  console.log("path:", event.path);
+  console.log("query:", JSON.stringify(event.queryStringParameters || {}));
+  console.log("headers:", JSON.stringify(event.headers || {}));
+  console.log("body:", event.body || null);
+
   const config = getConfig();
 
   if (event.httpMethod === "GET") {
@@ -32,9 +39,15 @@ exports.handler = async function handler(event) {
     return buildResponse(405, { error: "Method not allowed" });
   }
 
+  console.log("=== POST WHATSAPP WEBHOOK ===");
+  console.log("method:", event.httpMethod);
+  console.log("raw body:", event.body);
+
   try {
     const payload = JSON.parse(event.body || "{}");
+    console.log("parsed payload:", JSON.stringify(payload));
     const messages = extractIncomingMessages(payload);
+    console.log("extracted messages:", JSON.stringify(messages));
 
     if (!messages.length) {
       return buildResponse(200, {
