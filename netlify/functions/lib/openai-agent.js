@@ -73,7 +73,7 @@ const TOOL_DEFINITIONS = [
         notes: { type: "string" },
         whatsapp_user_id: { type: "string" }
       },
-      required: ["whatsapp_user_id", "adult_name", "student_name"]
+      required: ["whatsapp_user_id", "adult_name", "student_name", "student_level", "student_age", "subject", "modality", "notes"]
     }
   },
   {
