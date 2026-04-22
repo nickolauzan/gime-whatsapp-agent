@@ -66,11 +66,11 @@ const TOOL_DEFINITIONS = [
       properties: {
         adult_name: { type: "string" },
         student_name: { type: "string" },
-        student_level: { type: "string" },
+        student_level: { type: ["string", "null"] },
         student_age: { type: "string" },
-        subject: { type: "string" },
+        subject: { type: ["string", "null"] },
         modality: { type: "string" },
-        notes: { type: "string" },
+        notes: { type: ["string", "null"] },
         whatsapp_user_id: { type: "string" }
       },
       required: ["whatsapp_user_id", "adult_name", "student_name", "student_level", "student_age", "subject", "modality", "notes"]
@@ -89,7 +89,7 @@ const TOOL_DEFINITIONS = [
         date_to: { type: "string" },
         preferred_modality: { type: "string" }
       },
-      required: ["date_from", "date_to"]
+      required: ["date_from", "date_to", "preferred_modality"]
     }
   },
   {
@@ -103,13 +103,13 @@ const TOOL_DEFINITIONS = [
       properties: {
         adult_name: { type: "string" },
         student_name: { type: "string" },
-        subject: { type: "string" },
+        subject: { type: ["string", "null"] },
         slot_start: { type: "string" },
         slot_end: { type: "string" },
         modality: { type: "string" },
         whatsapp_user_id: { type: "string" }
       },
-      required: ["adult_name", "student_name", "slot_start", "slot_end", "whatsapp_user_id"]
+      required: ["adult_name", "student_name", "slot_start", "slot_end", "whatsapp_user_id", "modality", "subject"]
     }
   },
   {
@@ -126,7 +126,7 @@ const TOOL_DEFINITIONS = [
         summary: { type: "string" },
         whatsapp_user_id: { type: "string" }
       },
-      required: ["reason", "summary", "whatsapp_user_id"]
+      required: ["reason", "summary", "whatsapp_user_id", "priority"]
     }
   },
   {
