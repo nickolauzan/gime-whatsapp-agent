@@ -1,0 +1,32 @@
+[
+  {
+    "id": "service-overview",
+    "keywords": ["apoyo", "escolar", "servicio", "clases", "acompanamiento"],
+    "answer": "Ofrezco apoyo escolar personalizado para nivel primario, con entrevista inicial, clases individuales y seguimiento cercano segun las necesidades del alumno.",
+    "source": "services"
+  },
+  {
+    "id": "modalities",
+    "keywords": ["modalidad", "online", "presencial", "virtual"],
+    "answer": "Las clases pueden coordinarse en modalidad presencial u online, segun disponibilidad y necesidad de cada caso.",
+    "source": "services"
+  },
+  {
+    "id": "subjects",
+    "keywords": ["materias", "materia", "matematica", "lengua", "ciencias", "estudio"],
+    "answer": "El apoyo puede enfocarse en contenidos escolares, refuerzo de materias troncales y tecnicas de estudio para nivel primario.",
+    "source": "services"
+  },
+  {
+    "id": "interview",
+    "keywords": ["entrevista", "inicial", "conocer", "primera", "reunion"],
+    "answer": "La entrevista inicial sirve para conocer al alumno, entender la necesidad puntual y definir la modalidad y el plan de acompanamiento.",
+    "source": "process"
+  },
+  {
+    "id": "booking",
+    "keywords": ["turno", "agendar", "horario", "reserva", "entrevista"],
+    "answer": "Puedo ayudarte a coordinar una entrevista inicial. Si queres, decime nombre del adulto, nombre del alumno, materia principal y franja horaria preferida.",
+    "source": "booking"
+  }
+]

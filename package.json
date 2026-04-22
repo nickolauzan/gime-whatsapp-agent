@@ -1,0 +1,13 @@
+{
+  "name": "gime-vcard-netlify",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "netlify dev",
+    "functions:serve": "netlify functions:serve",
+    "build": "echo \"Static site with Netlify Functions\""
+  },
+  "dependencies": {
+    "openai": "^4.104.0"
+  }
+}

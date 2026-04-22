@@ -1,0 +1,23 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/health"
+  to = "/.netlify/functions/health"
+  status = 200
+
+[[redirects]]
+  from = "/api/webhooks/whatsapp"
+  to = "/.netlify/functions/whatsapp-webhook"
+  status = 200
+
+[[redirects]]
+  from = "/api/agent/reply"
+  to = "/.netlify/functions/agent-reply"
+  status = 200
+
+[[redirects]]
+  from = "/api/agent/book"
+  to = "/.netlify/functions/agent-book"
+  status = 200
