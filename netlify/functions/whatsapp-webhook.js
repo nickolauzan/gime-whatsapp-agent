@@ -46,6 +46,7 @@ exports.handler = async function handler(event) {
   try {
     const payload = JSON.parse(event.body || "{}");
     console.log("parsed payload:", JSON.stringify(payload));
+
     const messages = extractIncomingMessages(payload);
     console.log("extracted messages:", JSON.stringify(messages));
 
@@ -57,16 +58,24 @@ exports.handler = async function handler(event) {
     }
 
     for (const message of messages) {
+      console.log("processing message:", JSON.stringify(message));
+      console.log("calling OpenAI with:", message.text);
+      
       const reply = await generateAgentReply({
         messageText: message.text,
         whatsappUserId: message.from,
         profileName: message.profileName
       });
-
+      
+      console.log("OpenAI response:", response);
+      console.log("sending reply to WhatsApp...");
+      
       await sendWhatsAppText({
         to: message.from,
         text: reply
       });
+      
+      console.log("reply sent OK");
     }
 
     return buildResponse(200, {
@@ -74,6 +83,10 @@ exports.handler = async function handler(event) {
       processed: messages.length
     });
   } catch (error) {
+    console.error("WHATSAPP WEBHOOK ERROR:", error);
+    console.error("error message:", error?.message);
+    console.error("error stack:", error?.stack);
+
     return buildResponse(500, {
       ok: false,
       error: error.message
