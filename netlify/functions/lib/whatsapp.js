@@ -31,6 +31,7 @@ function extractIncomingMessages(payload) {
 
       for (const message of incoming) {
         messages.push({
+          id: message.id || "",
           from: message.from,
           profileName: contacts[0]?.profile?.name || "",
           text:
@@ -38,7 +39,8 @@ function extractIncomingMessages(payload) {
             message.button?.text ||
             message.interactive?.button_reply?.title ||
             "",
-          type: message.type
+          type: message.type,
+          timestamp: message.timestamp || ""
         });
       }
     }

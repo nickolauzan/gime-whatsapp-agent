@@ -18,6 +18,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/agent/availability"
+  to = "/.netlify/functions/agent-availability"
+  status = 200
+
+[[redirects]]
   from = "/api/agent/book"
   to = "/.netlify/functions/agent-book"
   status = 200

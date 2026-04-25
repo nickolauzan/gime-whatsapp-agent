@@ -8,6 +8,8 @@
     "build": "echo \"Static site with Netlify Functions\""
   },
   "dependencies": {
+    "@netlify/blobs": "^8.1.0",
+    "googleapis": "^171.4.0",
     "openai": "^4.104.0"
   }
 }

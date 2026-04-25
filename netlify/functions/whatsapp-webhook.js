@@ -6,6 +6,12 @@ const {
   extractIncomingMessages,
   sendWhatsAppText
 } = require("./lib/whatsapp");
+const {
+  hasProcessedMessage,
+  loadConversation,
+  markProcessedMessage,
+  saveConversation
+} = require("./lib/conversation-store");
 
 exports.handler = async function handler(event) {
   console.log("=== WHATSAPP WEBHOOK HIT ===");
@@ -57,8 +63,19 @@ exports.handler = async function handler(event) {
       });
     }
 
+    let processedCount = 0;
+
     for (const message of messages) {
       console.log("processing message:", JSON.stringify(message));
+
+      const conversation = await loadConversation(message.from);
+
+      if (hasProcessedMessage(conversation, message.id)) {
+        console.log("duplicate message ignored:", message.id);
+        continue;
+      }
+
+      await saveConversation(markProcessedMessage(conversation, message.id));
       console.log("calling OpenAI with:", message.text);
       
       const reply = await generateAgentReply({
@@ -80,11 +97,12 @@ exports.handler = async function handler(event) {
       });
       
       console.log("reply sent OK");
+      processedCount += 1;
     }
 
     return buildResponse(200, {
       ok: true,
-      processed: messages.length
+      processed: processedCount
     });
   } catch (error) {
     console.error("WHATSAPP WEBHOOK ERROR:", error);

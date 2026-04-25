@@ -1,11 +1,22 @@
 const faqEntries = require("../../../data/faq.json");
+const {
+  buildConversationSummary,
+  loadConversation,
+  mergeLead,
+  saveConversation
+} = require("./conversation-store");
+const {
+  createCalendarInterview,
+  queryCalendarAvailability
+} = require("./google-calendar");
 
 const serviceSnapshot = {
   levels: ["Nivel primario"],
   subjects: ["Matematica", "Lengua", "Ciencias", "Tecnicas de estudio"],
   modalities: ["Presencial", "Online"],
   classFormat: "Clases individuales con seguimiento personalizado",
-  interviewFormat: "Entrevista inicial breve para conocer al alumno y definir el plan"
+  interviewFormat: "Entrevista inicial breve para conocer al alumno y definir el plan",
+  scopeNote: "El servicio actual esta orientado solo a nivel primario."
 };
 
 function normalizeText(value) {
@@ -51,34 +62,68 @@ async function getServices() {
 }
 
 async function saveLead(payload) {
+  const conversation = await loadConversation(payload.whatsapp_user_id);
+  const updatedConversation = mergeLead(conversation, {
+    adultName: payload.adult_name,
+    studentName: payload.student_name,
+    studentLevel: payload.student_level,
+    studentAge: payload.student_age,
+    subject: payload.subject,
+    modality: payload.modality,
+    notes: payload.notes
+  });
+
+  const persisted = await saveConversation({
+    ...updatedConversation,
+    status: "lead_captured",
+    summary: buildConversationSummary(updatedConversation)
+  });
+
   return {
-    status: "captured_without_database",
-    lead: payload
+    status: "captured_in_conversation_store",
+    lead: persisted.lead
   };
 }
 
 async function getAvailability({ date_from, date_to, preferred_modality }) {
-  return {
-    status: "calendar_not_connected",
-    suggested_slots: [],
-    requested_window: {
-      date_from,
-      date_to,
-      preferred_modality
-    },
-    message:
-      "La agenda automatica todavia no esta conectada. El caso debe pasar a coordinacion manual o integrar Google Calendar."
-  };
+  return queryCalendarAvailability({
+    dateFrom: date_from,
+    dateTo: date_to,
+    preferredModality: preferred_modality
+  });
 }
 
 async function bookInterview(payload) {
+  const result = await createCalendarInterview({
+    adultName: payload.adult_name,
+    studentName: payload.student_name,
+    subject: payload.subject,
+    slotStart: payload.slot_start,
+    slotEnd: payload.slot_end,
+    modality: payload.modality,
+    whatsappUserId: payload.whatsapp_user_id
+  });
+
+  if (result.status === "booked" && payload.whatsapp_user_id) {
+    const conversation = await loadConversation(payload.whatsapp_user_id);
+    const updatedConversation = mergeLead(conversation, {
+      adultName: payload.adult_name,
+      studentName: payload.student_name,
+      subject: payload.subject,
+      modality: payload.modality
+    });
+
+    await saveConversation({
+      ...updatedConversation,
+      awaitingField: null,
+      status: "interview_booked",
+      summary: `${buildConversationSummary(updatedConversation)} | turno=${result.slot.label}`
+    });
+  }
+
   return {
-    status: "pending_manual_booking",
-    booking_id: null,
-    calendar_event_id: null,
-    booking_request: payload,
-    message:
-      "La reserva automatica todavia no esta habilitada. La solicitud debe pasar a coordinacion manual."
+    ...result,
+    booking_request: payload
   };
 }
 
@@ -90,10 +135,15 @@ async function handoffToHuman(payload) {
 }
 
 async function getConversationContext({ whatsapp_user_id }) {
+  const conversation = await loadConversation(whatsapp_user_id);
+
   return {
     whatsapp_user_id,
-    status: "new",
-    summary: "",
+    status: conversation.status,
+    summary: buildConversationSummary(conversation),
+    awaiting_field: conversation.awaitingField,
+    lead: conversation.lead,
+    history: conversation.history,
     needs_human: false
   };
 }
