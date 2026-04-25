@@ -25,6 +25,59 @@ function parseWorkdays(value) {
   return parsed.length ? parsed : [1, 2, 3, 4, 5];
 }
 
+function parseClockValue(value) {
+  const match = String(value || "")
+    .trim()
+    .match(/^(\d{1,2}):(\d{2})$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number.parseInt(match[1], 10);
+  const minutes = Number.parseInt(match[2], 10);
+
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+
+  return hours * 60 + minutes;
+}
+
+function parseWorkdayWindows(value, fallbackStartHour, fallbackEndHour) {
+  const parsed = String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((windowValue) => {
+      const [startRaw, endRaw] = windowValue.split("-");
+      const startMinutes = parseClockValue(startRaw);
+      const endMinutes = parseClockValue(endRaw);
+
+      if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+        return null;
+      }
+
+      return {
+        startMinutes,
+        endMinutes
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.startMinutes - right.startMinutes);
+
+  if (parsed.length) {
+    return parsed;
+  }
+
+  return [
+    {
+      startMinutes: fallbackStartHour * 60,
+      endMinutes: fallbackEndHour * 60
+    }
+  ];
+}
+
 function parseServiceAccountJson(rawJson) {
   const parsed = JSON.parse(rawJson);
 
@@ -42,6 +95,11 @@ function getCalendarSettings() {
     timezone: config.googleCalendarTimezone,
     utcOffset: config.googleCalendarUtcOffset,
     interviewDurationMinutes: config.interviewDurationMinutes,
+    workdayWindows: parseWorkdayWindows(
+      config.workdayWindows,
+      config.workdayStartHour,
+      config.workdayEndHour,
+    ),
     workdayStartHour: config.workdayStartHour,
     workdayEndHour: config.workdayEndHour,
     workdays: parseWorkdays(config.workdays)
@@ -133,11 +191,13 @@ function isWithinWorkWindow(slotStart, slotEnd, settings) {
   const startMinutes = startLocal.hour * 60 + startLocal.minute;
   const endMinutes = endLocal.hour * 60 + endLocal.minute;
 
-  return (
-    startMinutes >= settings.workdayStartHour * 60 &&
-    endMinutes <= settings.workdayEndHour * 60 &&
-    endMinutes > startMinutes
-  );
+  if (endMinutes <= startMinutes) {
+    return false;
+  }
+
+  return settings.workdayWindows.some((window) => {
+    return startMinutes >= window.startMinutes && endMinutes <= window.endMinutes;
+  });
 }
 
 function formatSlotLabel(date, timeZone) {

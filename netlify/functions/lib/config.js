@@ -2,6 +2,7 @@ const DEFAULT_MODEL = "gpt-4.1-mini";
 const DEFAULT_CALENDAR_TIMEZONE = "America/Argentina/Buenos_Aires";
 const DEFAULT_CALENDAR_UTC_OFFSET = "-03:00";
 const DEFAULT_INTERVIEW_DURATION_MINUTES = 30;
+const DEFAULT_WORKDAY_WINDOWS = "09:00-10:00,19:00-21:00";
 const DEFAULT_WORKDAY_START_HOUR = 9;
 const DEFAULT_WORKDAY_END_HOUR = 19;
 const DEFAULT_WORKDAYS = "1,2,3,4,5";
@@ -20,6 +21,7 @@ function getConfig() {
     interviewDurationMinutes:
       Number.parseInt(process.env.INTERVIEW_DURATION_MINUTES || "", 10) ||
       DEFAULT_INTERVIEW_DURATION_MINUTES,
+    workdayWindows: process.env.WORKDAY_WINDOWS || DEFAULT_WORKDAY_WINDOWS,
     workdayStartHour:
       Number.parseInt(process.env.WORKDAY_START_HOUR || "", 10) || DEFAULT_WORKDAY_START_HOUR,
     workdayEndHour:
@@ -38,7 +40,8 @@ function getConfigStatus() {
     ),
     calendarConfigured: Boolean(config.googleCalendarId && config.googleServiceAccountJson),
     openAiModel: config.openAiModel,
-    calendarTimezone: config.googleCalendarTimezone
+    calendarTimezone: config.googleCalendarTimezone,
+    workdayWindows: config.workdayWindows
   };
 }
 

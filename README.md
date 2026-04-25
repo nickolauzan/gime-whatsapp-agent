@@ -44,8 +44,7 @@ Definilas en Netlify:
 - `GOOGLE_CALENDAR_TIMEZONE`
 - `GOOGLE_CALENDAR_UTC_OFFSET`
 - `INTERVIEW_DURATION_MINUTES`
-- `WORKDAY_START_HOUR`
-- `WORKDAY_END_HOUR`
+- `WORKDAY_WINDOWS`
 - `WORKDAYS`
 
 ## Notas
@@ -53,5 +52,5 @@ Definilas en Netlify:
 - Si `OPENAI_API_KEY` no esta configurada, el agente cae a respuestas FAQ simples.
 - Si WhatsApp no esta configurado, el webhook recibe eventos pero no puede responder al usuario.
 - Para usar Google Calendar con service account, comparte el calendario objetivo con el email de la cuenta de servicio y dale permiso para editar eventos.
-- La disponibilidad usa `freeBusy` sobre la ventana pedida y propone bloques segun duracion, dias y horario laboral configurados.
+- La disponibilidad usa `freeBusy` sobre la ventana pedida y propone bloques segun duracion, dias y franjas horarias configuradas en `WORKDAY_WINDOWS` como `09:00-10:00,19:00-21:00`.
 - La reserva valida solapamientos y crea un evento real en Google Calendar.
