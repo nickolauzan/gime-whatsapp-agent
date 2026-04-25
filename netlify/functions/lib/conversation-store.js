@@ -1,4 +1,6 @@
 let getStore;
+let blobsUnavailableLogged = false;
+let blobsDisabled = false;
 
 try {
   ({ getStore } = require("@netlify/blobs"));
@@ -92,6 +94,10 @@ function normalizeConversation(record, whatsappUserId) {
 }
 
 function getBlobStore() {
+  if (blobsDisabled) {
+    return null;
+  }
+
   if (!getStore) {
     return null;
   }
@@ -103,7 +109,13 @@ function getBlobStore() {
   try {
     return getStore(STORE_NAME);
   } catch (error) {
-    console.warn("NETLIFY_BLOBS_STORE_UNAVAILABLE", error?.message || error);
+    blobsDisabled = true;
+
+    if (!blobsUnavailableLogged) {
+      console.warn("NETLIFY_BLOBS_STORE_UNAVAILABLE", error?.message || error);
+      blobsUnavailableLogged = true;
+    }
+
     return null;
   }
 }
@@ -122,7 +134,12 @@ async function loadConversation(whatsappUserId) {
         return normalized;
       }
     } catch (error) {
-      console.warn("NETLIFY_BLOBS_READ_FAILED", error?.message || error);
+      blobsDisabled = true;
+
+      if (!blobsUnavailableLogged) {
+        console.warn("NETLIFY_BLOBS_READ_FAILED", error?.message || error);
+        blobsUnavailableLogged = true;
+      }
     }
   }
 
@@ -140,7 +157,12 @@ async function saveConversation(conversation) {
     try {
       await store.set(key, JSON.stringify(normalized));
     } catch (error) {
-      console.warn("NETLIFY_BLOBS_WRITE_FAILED", error?.message || error);
+      blobsDisabled = true;
+
+      if (!blobsUnavailableLogged) {
+        console.warn("NETLIFY_BLOBS_WRITE_FAILED", error?.message || error);
+        blobsUnavailableLogged = true;
+      }
     }
   }
 
