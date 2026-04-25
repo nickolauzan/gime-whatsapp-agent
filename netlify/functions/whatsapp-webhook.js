@@ -7,10 +7,13 @@ const {
   sendWhatsAppText
 } = require("./lib/whatsapp");
 const {
+  clearPendingReply,
+  getPendingReply,
   hasProcessedMessage,
   loadConversation,
   markProcessedMessage,
-  saveConversation
+  saveConversation,
+  setPendingReply
 } = require("./lib/conversation-store");
 
 exports.handler = async function handler(event) {
@@ -68,21 +71,30 @@ exports.handler = async function handler(event) {
     for (const message of messages) {
       console.log("processing message:", JSON.stringify(message));
 
-      const conversation = await loadConversation(message.from);
+      let conversation = await loadConversation(message.from);
 
       if (hasProcessedMessage(conversation, message.id)) {
         console.log("duplicate message ignored:", message.id);
         continue;
       }
 
-      await saveConversation(markProcessedMessage(conversation, message.id));
-      console.log("calling OpenAI with:", message.text);
-      
-      const reply = await generateAgentReply({
-        messageText: message.text,
-        whatsappUserId: message.from,
-        profileName: message.profileName
-      });
+      let reply = getPendingReply(conversation, message.id);
+
+      if (reply) {
+        console.log("reusing pending reply for message:", message.id);
+      } else {
+        console.log("calling OpenAI with:", message.text);
+        
+        reply = await generateAgentReply({
+          messageText: message.text,
+          whatsappUserId: message.from,
+          profileName: message.profileName
+        });
+
+        conversation = await loadConversation(message.from);
+        conversation = setPendingReply(conversation, message.id, reply);
+        await saveConversation(conversation);
+      }
       
       console.log("OpenAI reply:", reply);
       console.log("sending reply to WhatsApp...");
@@ -96,6 +108,11 @@ exports.handler = async function handler(event) {
         text: reply
       });
       
+      conversation = await loadConversation(message.from);
+      conversation = clearPendingReply(conversation, message.id);
+      conversation = markProcessedMessage(conversation, message.id);
+      await saveConversation(conversation);
+
       console.log("reply sent OK");
       processedCount += 1;
     }

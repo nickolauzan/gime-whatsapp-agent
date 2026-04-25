@@ -12,6 +12,7 @@ const memoryStore = new Map();
 const STORE_NAME = "whatsapp-agent";
 const MAX_HISTORY_ITEMS = 12;
 const MAX_PROCESSED_MESSAGE_IDS = 40;
+const MAX_PENDING_REPLIES = 20;
 
 function getConversationKey(whatsappUserId) {
   return `conversations/${whatsappUserId}.json`;
@@ -38,6 +39,7 @@ function createEmptyConversation(whatsappUserId) {
     },
     history: [],
     processedMessageIds: [],
+    pendingReplies: {},
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -88,6 +90,15 @@ function normalizeConversation(record, whatsappUserId) {
     processedMessageIds: Array.isArray(record?.processedMessageIds)
       ? record.processedMessageIds.slice(-MAX_PROCESSED_MESSAGE_IDS).filter(Boolean)
       : [],
+    pendingReplies:
+      record?.pendingReplies && typeof record.pendingReplies === "object"
+        ? Object.fromEntries(
+            Object.entries(record.pendingReplies)
+              .filter(([messageId, reply]) => messageId && trimString(reply))
+              .slice(-MAX_PENDING_REPLIES)
+              .map(([messageId, reply]) => [messageId, trimString(reply)]),
+          )
+        : {},
     createdAt: record?.createdAt || empty.createdAt,
     updatedAt: new Date().toISOString()
   };
@@ -191,6 +202,43 @@ function markProcessedMessage(conversation, messageId) {
   };
 }
 
+function getPendingReply(conversation, messageId) {
+  if (!messageId) {
+    return "";
+  }
+
+  return trimString(conversation.pendingReplies?.[messageId]);
+}
+
+function setPendingReply(conversation, messageId, replyText) {
+  if (!messageId || !trimString(replyText)) {
+    return conversation;
+  }
+
+  const entries = Object.entries(conversation.pendingReplies || {}).filter(([key]) => key !== messageId);
+  entries.push([messageId, trimString(replyText)]);
+
+  return {
+    ...conversation,
+    pendingReplies: Object.fromEntries(entries.slice(-MAX_PENDING_REPLIES))
+  };
+}
+
+function clearPendingReply(conversation, messageId) {
+  if (!messageId) {
+    return conversation;
+  }
+
+  const pendingReplies = Object.fromEntries(
+    Object.entries(conversation.pendingReplies || {}).filter(([key]) => key !== messageId),
+  );
+
+  return {
+    ...conversation,
+    pendingReplies
+  };
+}
+
 function appendHistory(conversation, role, text) {
   const cleanText = trimString(text);
 
@@ -250,11 +298,14 @@ function buildConversationSummary(conversation) {
 
 module.exports = {
   appendHistory,
+  clearPendingReply,
   buildConversationSummary,
   createEmptyConversation,
+  getPendingReply,
   hasProcessedMessage,
   loadConversation,
   markProcessedMessage,
   mergeLead,
-  saveConversation
+  saveConversation,
+  setPendingReply
 };
