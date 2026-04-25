@@ -70,8 +70,12 @@ exports.handler = async function handler(event) {
       console.log("OpenAI reply:", reply);
       console.log("sending reply to WhatsApp...");
       
+      const normalizedTo = message.from.replace(/^54911/, "5411");
+
+      console.log("sending reply to WhatsApp to:", normalizedTo);
+
       await sendWhatsAppText({
-        to: message.from,
+        to: normalizedTo,
         text: reply
       });
       
