@@ -343,7 +343,12 @@ function buildModelInput(conversation, profileName) {
   for (const item of conversation.history) {
     input.push({
       role: item.role,
-      content: [{ type: "input_text", text: item.text }]
+      content: [
+        {
+          type: item.role === "assistant" ? "output_text" : "input_text",
+          text: item.text
+        }
+      ]
     });
   }
 
