@@ -9,7 +9,7 @@ const CONTACT_CONFIG = {
   scheduleUrl: "",
   whatsappQuestionsMessage: "",
   whatsappScheduleMessage:
-    "Hola, me gustaría agendar una entrevista para apoyo escolar.",
+    "Hola! Me gustaría agendar una entrevista para apoyo escolar",
 };
 
 function buildWhatsappUrl(number, message) {
