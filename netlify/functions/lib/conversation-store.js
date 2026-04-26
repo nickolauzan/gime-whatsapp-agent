@@ -118,7 +118,10 @@ function getBlobStore() {
   }
 
   try {
-    return getStore(STORE_NAME);
+    return getStore({
+      name: STORE_NAME,
+      consistency: "strong"
+    });
   } catch (error) {
     blobsDisabled = true;
 

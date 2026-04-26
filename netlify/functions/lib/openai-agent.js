@@ -40,9 +40,13 @@ Reglas obligatorias:
 - no asumas que un nombre corto significa que ahora habla otra persona
 - hace una sola pregunta por vez si faltan datos
 - no inventes horarios ni reservas
+- si preguntan por disponibilidad, agenda, manana, un dia puntual, semana que viene o proximo turno, consulta la agenda antes de responder
+- cuando hables de agenda, usa fechas absolutas con dia y mes
 - no inventes precios
 - responde en espanol rioplatense, con tono calido y profesional
 - mantenete breve, natural y apto para WhatsApp
+- evita repetir toda la ficha del alumno en cada mensaje
+- si ya captaste un dato, avanza al siguiente punto sin reformular todo
 `.trim();
 
 const TOOL_DEFINITIONS = [
@@ -184,11 +188,433 @@ const UNSUPPORTED_LEVEL_PATTERN =
 const PRIMARY_LEVEL_PATTERN =
   /\b(primaria|primario|primer grado|segundo grado|tercer grado|cuarto grado|quinto grado|sexto grado|1ro|2do|3ro|4to|5to|6to|grado)\b/;
 
+const WEEKDAY_LABELS = [
+  "domingo",
+  "lunes",
+  "martes",
+  "miercoles",
+  "jueves",
+  "viernes",
+  "sabado"
+];
+
+const WEEKDAY_INDEX_BY_NAME = {
+  domingo: 0,
+  lunes: 1,
+  martes: 2,
+  miercoles: 3,
+  jueves: 4,
+  viernes: 5,
+  sabado: 6
+};
+
 function normalizeText(value) {
   return String(value || "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
+}
+
+function padTwo(value) {
+  return String(value).padStart(2, "0");
+}
+
+function getLocalDateParts(date, timeZone) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const weekdayLookup = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6
+  };
+
+  return {
+    dateKey: `${map.year}-${map.month}-${map.day}`,
+    weekdayIndex: weekdayLookup[map.weekday] ?? null,
+    hour: Number.parseInt(map.hour, 10),
+    minute: Number.parseInt(map.minute, 10)
+  };
+}
+
+function addDaysToDateKey(dateKey, days, utcOffset) {
+  const date = new Date(`${dateKey}T12:00:00${utcOffset}`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function buildOffsetDateTime(dateKey, hours, minutes, utcOffset) {
+  return `${dateKey}T${padTwo(hours)}:${padTwo(minutes)}:00${utcOffset}`;
+}
+
+function formatWindowLabel(dateTimeIso, timeZone) {
+  const date = new Date(dateTimeIso);
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone,
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).format(date);
+}
+
+function formatSlotsList(slots, timeZone) {
+  return slots
+    .map((slot) => {
+      if (slot.label) {
+        return slot.label;
+      }
+
+      return formatWindowLabel(slot.start, timeZone);
+    })
+    .join(", ");
+}
+
+function parseTimeFromMessage(messageText) {
+  const match = String(messageText || "").match(
+    /\b(?:a\s*las?\s*)?(\d{1,2})(?::(\d{2}))?\s*(?:hs?|horas)?\b/i,
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number.parseInt(match[1], 10);
+  const minutes = Number.parseInt(match[2] || "0", 10);
+
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours > 23 || minutes > 59) {
+    return null;
+  }
+
+  return { hours, minutes };
+}
+
+function looksLikeAvailabilityIntent(messageText) {
+  const normalized = normalizeText(messageText);
+  const hasScheduleKeywords =
+    /\b(disponible|disponibilidad|turno|turnos|horario|horarios|agenda|agendar|entrevista)\b/.test(
+      normalized,
+    );
+  const hasRelativeDay = /\b(hoy|manana)\b/.test(normalized);
+  const hasWeekdayReference =
+    /\b(lunes|martes|miercoles|jueves|viernes|sabado|domingo)\b/.test(normalized);
+  const hasSchedulingQualifier =
+    /\?/.test(String(messageText || "")) ||
+    /\b(a las|por la|puede ser|te viene|me viene|serviria|serviria|libre|disponible)\b/.test(
+      normalized,
+    );
+
+  return (
+    hasScheduleKeywords ||
+    hasRelativeDay ||
+    /\bsemana que viene\b/.test(normalized) ||
+    /\bproximo horario\b|\bsiguiente horario\b|\bprimer horario\b|\bproximo turno\b/.test(normalized) ||
+    (hasWeekdayReference && hasSchedulingQualifier)
+  );
+}
+
+function isGeneralHoursQuestion(messageText) {
+  const normalized = normalizeText(messageText);
+
+  return (
+    /\bque dias y horarios\b/.test(normalized) ||
+    /\bque horarios trabajas\b/.test(normalized) ||
+    /\bdias y horarios\b/.test(normalized) ||
+    /\bcuando trabajas\b/.test(normalized)
+  );
+}
+
+function wantsNextAvailable(messageText) {
+  const normalized = normalizeText(messageText);
+
+  return (
+    /\bproximo horario disponible\b/.test(normalized) ||
+    /\bcual es el proximo horario\b/.test(normalized) ||
+    /\bsiguiente horario\b/.test(normalized) ||
+    /\bprimer horario\b/.test(normalized) ||
+    /\bque tenes disponible\b/.test(normalized) ||
+    /\bque dias y horarios\b/.test(normalized) ||
+    /\bsemana que viene\b/.test(normalized)
+  );
+}
+
+function getPreferredModality(conversation) {
+  return conversation.lead.modality || "Presencial";
+}
+
+function getTimeSegment(messageText) {
+  const normalized = normalizeText(messageText);
+
+  if (/\bpor la manana\b/.test(normalized)) {
+    return { startHour: 0, startMinute: 0, endHour: 12, endMinute: 59 };
+  }
+
+  if (/\bpor la tarde\b/.test(normalized)) {
+    return { startHour: 13, startMinute: 0, endHour: 17, endMinute: 59 };
+  }
+
+  if (/\bpor la noche\b/.test(normalized)) {
+    return { startHour: 18, startMinute: 0, endHour: 23, endMinute: 59 };
+  }
+
+  return null;
+}
+
+function resolveSpecificDateKey(messageText, config) {
+  const normalized = normalizeText(messageText);
+  const nowParts = getLocalDateParts(new Date(), config.googleCalendarTimezone);
+
+  if (/\bhoy\b/.test(normalized)) {
+    return nowParts.dateKey;
+  }
+
+  if (/^manana\b/.test(normalized) || (/\bmanana\b/.test(normalized) && !/\bpor la manana\b/.test(normalized))) {
+    return addDaysToDateKey(nowParts.dateKey, 1, config.googleCalendarUtcOffset);
+  }
+
+  for (const [weekdayName, weekdayIndex] of Object.entries(WEEKDAY_INDEX_BY_NAME)) {
+    if (new RegExp(`\\b${weekdayName}\\b`).test(normalized)) {
+      let delta = (weekdayIndex - nowParts.weekdayIndex + 7) % 7;
+
+      if (delta === 0) {
+        delta = 7;
+      }
+
+      return addDaysToDateKey(nowParts.dateKey, delta, config.googleCalendarUtcOffset);
+    }
+  }
+
+  return "";
+}
+
+function resolveNextWeekWindow(config) {
+  const nowParts = getLocalDateParts(new Date(), config.googleCalendarTimezone);
+  const currentWeekMondayDelta = (8 - nowParts.weekdayIndex) % 7 || 7;
+  const mondayDateKey = addDaysToDateKey(
+    nowParts.dateKey,
+    currentWeekMondayDelta,
+    config.googleCalendarUtcOffset,
+  );
+  const fridayDateKey = addDaysToDateKey(mondayDateKey, 4, config.googleCalendarUtcOffset);
+
+  return {
+    dateFrom: buildOffsetDateTime(mondayDateKey, 0, 0, config.googleCalendarUtcOffset),
+    dateTo: buildOffsetDateTime(fridayDateKey, 23, 59, config.googleCalendarUtcOffset)
+  };
+}
+
+function resolveAvailabilityRequest(messageText, conversation, config) {
+  if (!looksLikeAvailabilityIntent(messageText)) {
+    return null;
+  }
+
+  if (isGeneralHoursQuestion(messageText)) {
+    return { kind: "general_hours" };
+  }
+
+  const normalized = normalizeText(messageText);
+  const preferredModality = getPreferredModality(conversation);
+  const nowParts = getLocalDateParts(new Date(), config.googleCalendarTimezone);
+
+  if (wantsNextAvailable(messageText)) {
+    if (/\bsemana que viene\b/.test(normalized)) {
+      const nextWeekWindow = resolveNextWeekWindow(config);
+
+      return {
+        kind: "window",
+        label: "la semana que viene",
+        preferredModality,
+        ...nextWeekWindow
+      };
+    }
+
+    return {
+      kind: "next_available",
+      preferredModality,
+      dateFrom: buildOffsetDateTime(
+        nowParts.dateKey,
+        nowParts.hour,
+        nowParts.minute,
+        config.googleCalendarUtcOffset,
+      ),
+      dateTo: buildOffsetDateTime(
+        addDaysToDateKey(nowParts.dateKey, 14, config.googleCalendarUtcOffset),
+        23,
+        59,
+        config.googleCalendarUtcOffset,
+      )
+    };
+  }
+
+  const dateKey = resolveSpecificDateKey(messageText, config);
+
+  if (!dateKey) {
+    return null;
+  }
+
+  const specificTime = parseTimeFromMessage(messageText);
+
+  if (specificTime) {
+    const slotStart = buildOffsetDateTime(
+      dateKey,
+      specificTime.hours,
+      specificTime.minutes,
+      config.googleCalendarUtcOffset,
+    );
+    const slotEndDate = new Date(slotStart);
+    slotEndDate.setUTCMinutes(slotEndDate.getUTCMinutes() + config.interviewDurationMinutes);
+
+    return {
+      kind: "exact_slot",
+      preferredModality,
+      dateFrom: slotStart,
+      dateTo: slotEndDate.toISOString(),
+      requestedSlotStart: slotStart
+    };
+  }
+
+  const timeSegment = getTimeSegment(messageText);
+
+  if (timeSegment) {
+    return {
+      kind: "window",
+      label: formatWindowLabel(
+        buildOffsetDateTime(dateKey, timeSegment.startHour, timeSegment.startMinute, config.googleCalendarUtcOffset),
+        config.googleCalendarTimezone,
+      ),
+      preferredModality,
+      dateFrom: buildOffsetDateTime(
+        dateKey,
+        timeSegment.startHour,
+        timeSegment.startMinute,
+        config.googleCalendarUtcOffset,
+      ),
+      dateTo: buildOffsetDateTime(
+        dateKey,
+        timeSegment.endHour,
+        timeSegment.endMinute,
+        config.googleCalendarUtcOffset,
+      )
+    };
+  }
+
+  return {
+    kind: "window",
+    label: dateKey,
+    preferredModality,
+    dateFrom: buildOffsetDateTime(dateKey, 0, 0, config.googleCalendarUtcOffset),
+    dateTo: buildOffsetDateTime(dateKey, 23, 59, config.googleCalendarUtcOffset)
+  };
+}
+
+function formatWorkdayWindows(workdayWindows) {
+  const windows = String(workdayWindows || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => item.replace("-", " a "));
+
+  return windows.join(" y ");
+}
+
+async function findFallbackNextAvailable(preferredModality, config) {
+  const nowParts = getLocalDateParts(new Date(), config.googleCalendarTimezone);
+  return getAvailability({
+    date_from: buildOffsetDateTime(
+      nowParts.dateKey,
+      nowParts.hour,
+      nowParts.minute,
+      config.googleCalendarUtcOffset,
+    ),
+    date_to: buildOffsetDateTime(
+      addDaysToDateKey(nowParts.dateKey, 14, config.googleCalendarUtcOffset),
+      23,
+      59,
+      config.googleCalendarUtcOffset,
+    ),
+    preferred_modality: preferredModality
+  });
+}
+
+async function generateAvailabilityReply(messageText, conversation, config) {
+  const resolved = resolveAvailabilityRequest(messageText, conversation, config);
+
+  if (!resolved) {
+    return "";
+  }
+
+  if (resolved.kind === "general_hours") {
+    const windowsLabel = formatWorkdayWindows(config.workdayWindows);
+    return `Las entrevistas iniciales las estoy coordinando de lunes a viernes, de ${windowsLabel}. Si queres, te busco un horario puntual.`;
+  }
+
+  console.log("calendar query requested:", JSON.stringify(resolved));
+
+  const availability = await getAvailability({
+    date_from: resolved.dateFrom,
+    date_to: resolved.dateTo,
+    preferred_modality: resolved.preferredModality
+  });
+
+  console.log("calendar query result:", JSON.stringify(availability));
+
+  if (availability.status !== "calendar_connected") {
+    return availability.message || "Todavia no tengo la agenda conectada para confirmar horarios.";
+  }
+
+  const slots = availability.suggested_slots || [];
+
+  if (resolved.kind === "exact_slot") {
+    const requestedStartMs = new Date(resolved.requestedSlotStart).getTime();
+    const exactMatch = slots.find((slot) => new Date(slot.start).getTime() === requestedStartMs);
+
+    if (exactMatch) {
+      return `Si, ese horario esta disponible: ${exactMatch.label}. Si queres, te lo reservo.`;
+    }
+
+    const fallback = await findFallbackNextAvailable(resolved.preferredModality, config);
+    const fallbackSlots = fallback.suggested_slots || [];
+
+    if (fallback.status === "calendar_connected" && fallbackSlots.length) {
+      return `Ese horario no lo tengo libre. El proximo turno que veo es ${fallbackSlots[0].label}. Si queres, te lo reservo.`;
+    }
+
+    return "Ese horario no lo tengo libre. Si queres, probamos con otro dia u horario.";
+  }
+
+  if (slots.length) {
+    if (resolved.kind === "next_available") {
+      const visibleSlots = slots.slice(0, 3);
+      return `Los proximos horarios que tengo son ${formatSlotsList(visibleSlots, config.googleCalendarTimezone)}. Si queres, te reservo uno.`;
+    }
+
+    const visibleSlots = slots.slice(0, 3);
+    return `Para ese momento tengo ${formatSlotsList(visibleSlots, config.googleCalendarTimezone)}. Si queres, te reservo uno.`;
+  }
+
+  const fallback = await findFallbackNextAvailable(resolved.preferredModality, config);
+  const fallbackSlots = fallback.suggested_slots || [];
+
+  if (fallback.status === "calendar_connected" && fallbackSlots.length) {
+    return `En ese horario no tengo lugar. El proximo disponible que veo es ${fallbackSlots[0].label}. Si queres, te lo reservo.`;
+  }
+
+  return "No encontre espacios libres en esa franja. Si queres, proponeme otro dia u horario.";
 }
 
 function extractText(response) {
@@ -313,6 +739,8 @@ function buildUnsupportedLevelReply() {
 function buildRuntimeContext(conversation, profileName) {
   const serviceScope =
     "Servicio actual: apoyo escolar individual para nivel primario, presencial u online.";
+  const config = getConfig();
+  const nowParts = getLocalDateParts(new Date(), config.googleCalendarTimezone);
 
   const knownData = [
     `contacto_whatsapp=${profileName || conversation.profileName || "sin_dato"}`,
@@ -321,6 +749,11 @@ function buildRuntimeContext(conversation, profileName) {
     `nivel=${conversation.lead.studentLevel || "sin_dato"}`,
     `materia=${conversation.lead.subject || "sin_dato"}`,
     `modalidad=${conversation.lead.modality || "sin_dato"}`,
+    `fecha_local_actual=${nowParts.dateKey}`,
+    `dia_local_actual=${WEEKDAY_LABELS[nowParts.weekdayIndex] || "sin_dato"}`,
+    `hora_local_actual=${padTwo(nowParts.hour)}:${padTwo(nowParts.minute)}`,
+    `zona_horaria=${config.googleCalendarTimezone}`,
+    `franjas_entrevista=${config.workdayWindows}`,
     `esperando=${conversation.awaitingField || "ninguno"}`,
     `estado=${conversation.status || "new"}`
   ].join("\n");
@@ -356,24 +789,38 @@ function buildModelInput(conversation, profileName) {
 }
 
 async function executeTool(name, args) {
+  console.log("OpenAI tool call:", name, JSON.stringify(args));
+
+  let result;
+
   switch (name) {
     case "search_faq":
-      return searchFaq(args);
+      result = await searchFaq(args);
+      break;
     case "get_services":
-      return getServices();
+      result = await getServices();
+      break;
     case "save_lead":
-      return saveLead(args);
+      result = await saveLead(args);
+      break;
     case "get_availability":
-      return getAvailability(args);
+      result = await getAvailability(args);
+      break;
     case "book_interview":
-      return bookInterview(args);
+      result = await bookInterview(args);
+      break;
     case "handoff_to_human":
-      return handoffToHuman(args);
+      result = await handoffToHuman(args);
+      break;
     case "get_conversation_context":
-      return getConversationContext(args);
+      result = await getConversationContext(args);
+      break;
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
+
+  console.log("OpenAI tool result:", name, JSON.stringify(result));
+  return result;
 }
 
 async function generateRuleBasedReply(messageText, conversation) {
@@ -428,6 +875,12 @@ async function generateAgentReply({ messageText, whatsappUserId, profileName }) 
     conversation.status = "unsupported_level";
     conversation.awaitingField = null;
     return finalizeConversation(conversation, reply, null);
+  }
+
+  const availabilityReply = await generateAvailabilityReply(trimmedMessage, conversation, config);
+
+  if (availabilityReply) {
+    return finalizeConversation(conversation, availabilityReply, null);
   }
 
   if (!config.openAiApiKey) {
