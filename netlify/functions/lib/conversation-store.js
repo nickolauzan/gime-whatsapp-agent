@@ -23,6 +23,9 @@ function createEmptyConversation(whatsappUserId) {
     whatsappUserId,
     profileName: "",
     status: "new",
+    assistantState: "inactive",
+    assistantActivatedAt: "",
+    assistantDisabledAt: "",
     awaitingField: null,
     summary: "",
     lastUserMessage: "",
@@ -72,6 +75,9 @@ function normalizeConversation(record, whatsappUserId) {
     whatsappUserId,
     profileName: trimString(record?.profileName),
     status: trimString(record?.status) || empty.status,
+    assistantState: trimString(record?.assistantState) || empty.assistantState,
+    assistantActivatedAt: trimString(record?.assistantActivatedAt),
+    assistantDisabledAt: trimString(record?.assistantDisabledAt),
     awaitingField: trimString(record?.awaitingField) || null,
     summary: trimString(record?.summary),
     lastUserMessage: trimString(record?.lastUserMessage),
@@ -294,6 +300,10 @@ function buildConversationSummary(conversation) {
 
   if (conversation.awaitingField) {
     parts.push(`esperando=${conversation.awaitingField}`);
+  }
+
+  if (conversation.assistantState) {
+    parts.push(`asistente=${conversation.assistantState}`);
   }
 
   return parts.join(" | ");

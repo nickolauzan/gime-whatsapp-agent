@@ -1,5 +1,10 @@
 const { getConfig } = require("./lib/config");
-const { generateAgentReply } = require("./lib/openai-agent");
+const {
+  buildAssistantDisabledReply,
+  generateAgentReply,
+  shouldActivateAssistant,
+  shouldDeactivateAssistant
+} = require("./lib/openai-agent");
 const {
   buildResponse,
   getVerifyChallenge,
@@ -73,8 +78,87 @@ exports.handler = async function handler(event) {
 
       let conversation = await loadConversation(message.from);
 
+      conversation = {
+        ...conversation,
+        profileName: message.profileName || conversation.profileName
+      };
+
       if (hasProcessedMessage(conversation, message.id)) {
         console.log("duplicate message ignored:", message.id);
+        continue;
+      }
+
+      if (conversation.assistantState === "disabled") {
+        console.log("assistant disabled for contact, message ignored:", message.from);
+        conversation = markProcessedMessage(conversation, message.id);
+        await saveConversation(conversation);
+        continue;
+      }
+
+      if (conversation.assistantState !== "active") {
+        if (shouldDeactivateAssistant(message.text)) {
+          conversation = {
+            ...conversation,
+            assistantState: "disabled",
+            assistantDisabledAt: new Date().toISOString(),
+            awaitingField: null,
+            status: "manual_chat",
+            summary: "asistente=disabled"
+          };
+          conversation = markProcessedMessage(conversation, message.id);
+          await saveConversation(conversation);
+          continue;
+        }
+
+        if (!shouldActivateAssistant(message.text)) {
+          console.log("assistant inactive and no trigger detected, message ignored:", message.id);
+          conversation = {
+            ...conversation,
+            status: "manual_chat"
+          };
+          conversation = markProcessedMessage(conversation, message.id);
+          await saveConversation(conversation);
+          continue;
+        }
+
+        conversation = {
+          ...conversation,
+          assistantState: "active",
+          assistantActivatedAt: conversation.assistantActivatedAt || new Date().toISOString(),
+          status: "assistant_active"
+        };
+        await saveConversation(conversation);
+      }
+
+      if (shouldDeactivateAssistant(message.text)) {
+        const reply = buildAssistantDisabledReply();
+
+        conversation = {
+          ...conversation,
+          assistantState: "disabled",
+          assistantDisabledAt: new Date().toISOString(),
+          awaitingField: null,
+          lastAssistantReply: reply,
+          status: "manual_chat"
+        };
+        conversation = setPendingReply(conversation, message.id, reply);
+        await saveConversation(conversation);
+
+        console.log("sending assistant shutdown reply to WhatsApp...");
+
+        const normalizedTo = message.from.replace(/^54911/, "5411");
+        await sendWhatsAppText({
+          to: normalizedTo,
+          text: reply
+        });
+
+        conversation = await loadConversation(message.from);
+        conversation = clearPendingReply(conversation, message.id);
+        conversation = markProcessedMessage(conversation, message.id);
+        await saveConversation(conversation);
+
+        console.log("assistant disabled for contact:", message.from);
+        processedCount += 1;
         continue;
       }
 

@@ -7,15 +7,19 @@ const CONTACT_CONFIG = {
   email: "gimesoledadmendez@gmail.com",
   location: "Morón, Buenos Aires.",
   scheduleUrl: "",
-  whatsappQuestionsMessage:
-    "Hola, vi la v-card de apoyo escolar y quiero hacer una consulta.",
+  whatsappQuestionsMessage: "",
   whatsappScheduleMessage:
-    "Hola, vi la v-card de apoyo escolar y quiero agendar una entrevista inicial.",
+    "Hola, me gustaría agendar una entrevista para apoyo escolar.",
 };
 
 function buildWhatsappUrl(number, message) {
   if (!number) return "#configuracion";
   const sanitized = number.replace(/[^\d]/g, "");
+
+  if (!message) {
+    return `https://wa.me/${sanitized}`;
+  }
+
   return `https://wa.me/${sanitized}?text=${encodeURIComponent(message)}`;
 }
 

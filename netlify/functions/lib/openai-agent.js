@@ -34,6 +34,8 @@ Contexto fijo del servicio:
 
 Reglas obligatorias:
 - si el usuario pide secundaria, terciario o universidad, corregilo con claridad: deci que hoy el servicio es solo para primaria y no sigas como si ese nivel estuviera disponible
+- asumi por defecto que quien escribe es padre, madre o tutor y que consulta por un menor
+- no preguntes si el apoyo es para la persona que escribe, salvo que ella diga explicitamente que busca apoyo para si misma
 - no reinventes la conversacion en cada turno
 - no saludes de nuevo en mitad del chat
 - si el ultimo mensaje del asistente pidio un dato concreto y el usuario responde con un dato corto, interpretalo como respuesta a esa pregunta
@@ -208,11 +210,56 @@ const WEEKDAY_INDEX_BY_NAME = {
   sabado: 6
 };
 
+const ASSISTANT_TRIGGER_PATTERN =
+  /\b(agendar|coordinar|reservar)\b.*\b(entrevista|entrevista inicial)\b.*\b(apoyo escolar|clases|primario|primaria)?\b/;
+
+const ASSISTANT_STOP_PATTERNS = [
+  /\b(deja|deje|dejen|detene|detener|frena|frenar)\b.*\b(asistente|bot|ia|automat(ic|iz)ado|respuesta(s)? automatica(s)?)\b/,
+  /\b(no quiero|no quisiera|prefiero no)\b.*\b(asistente|bot|ia|automat(ic|iz)ado)\b/,
+  /\b(quiero|prefiero|necesito)\b.*\b(hablar|seguir)\b.*\b(con una persona|con alguien|con gimena|directamente)\b/,
+  /\b(pasa(me)?|deriva(me)?)\b.*\b(con una persona|con gimena|a humano)\b/,
+  /\bfin del asistente\b/,
+  /\bdeja la conversacion libre\b/
+];
+
 function normalizeText(value) {
   return String(value || "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
+}
+
+function shouldActivateAssistant(messageText) {
+  const normalized = normalizeText(messageText);
+
+  if (!normalized) {
+    return false;
+  }
+
+  return ASSISTANT_TRIGGER_PATTERN.test(normalized);
+}
+
+function shouldDeactivateAssistant(messageText) {
+  const normalized = normalizeText(messageText);
+  return ASSISTANT_STOP_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function buildAssistantDisabledReply() {
+  return "Perfecto. Dejo la conversación libre para que siga Gimena por acá.";
+}
+
+function shouldSendActivationOpening(messageText, conversation, leadPatch) {
+  return (
+    shouldActivateAssistant(messageText) &&
+    !conversation.lead.studentLevel &&
+    !conversation.lead.subject &&
+    !leadPatch.studentLevel &&
+    !leadPatch.subject
+  );
+}
+
+function buildActivationOpeningReply() {
+  return "Perfecto. Para coordinar la entrevista inicial, ¿me decís en qué grado está el alumno y qué materia necesitan reforzar?";
 }
 
 function padTwo(value) {
@@ -749,6 +796,7 @@ function buildRuntimeContext(conversation, profileName) {
     `nivel=${conversation.lead.studentLevel || "sin_dato"}`,
     `materia=${conversation.lead.subject || "sin_dato"}`,
     `modalidad=${conversation.lead.modality || "sin_dato"}`,
+    `rol_interlocutor_esperado=adulto_responsable`,
     `fecha_local_actual=${nowParts.dateKey}`,
     `dia_local_actual=${WEEKDAY_LABELS[nowParts.weekdayIndex] || "sin_dato"}`,
     `hora_local_actual=${padTwo(nowParts.hour)}:${padTwo(nowParts.minute)}`,
@@ -877,6 +925,10 @@ async function generateAgentReply({ messageText, whatsappUserId, profileName }) 
     return finalizeConversation(conversation, reply, null);
   }
 
+  if (shouldSendActivationOpening(trimmedMessage, conversation, leadPatch)) {
+    return finalizeConversation(conversation, buildActivationOpeningReply(), null);
+  }
+
   const availabilityReply = await generateAvailabilityReply(trimmedMessage, conversation, config);
 
   if (availabilityReply) {
@@ -930,5 +982,8 @@ async function generateAgentReply({ messageText, whatsappUserId, profileName }) 
 }
 
 module.exports = {
-  generateAgentReply
+  buildAssistantDisabledReply,
+  generateAgentReply,
+  shouldActivateAssistant,
+  shouldDeactivateAssistant
 };
