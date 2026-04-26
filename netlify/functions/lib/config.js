@@ -11,6 +11,7 @@ function getConfig() {
   return {
     openAiApiKey: process.env.OPENAI_API_KEY || "",
     openAiModel: process.env.OPENAI_MODEL || DEFAULT_MODEL,
+    agentAdminToken: process.env.AGENT_ADMIN_TOKEN || "",
     metaVerifyToken: process.env.META_VERIFY_TOKEN || "",
     whatsappAccessToken: process.env.WHATSAPP_ACCESS_TOKEN || "",
     whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
@@ -39,6 +40,7 @@ function getConfigStatus() {
       config.whatsappAccessToken && config.whatsappPhoneNumberId && config.metaVerifyToken
     ),
     calendarConfigured: Boolean(config.googleCalendarId && config.googleServiceAccountJson),
+    adminReactivationConfigured: Boolean(config.agentAdminToken),
     openAiModel: config.openAiModel,
     calendarTimezone: config.googleCalendarTimezone,
     workdayWindows: config.workdayWindows

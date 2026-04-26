@@ -309,6 +309,35 @@ function buildConversationSummary(conversation) {
   return parts.join(" | ");
 }
 
+function resetAssistantConversation(conversation) {
+  const preserved = normalizeConversation(conversation, conversation.whatsappUserId);
+
+  return {
+    ...preserved,
+    assistantState: "inactive",
+    assistantActivatedAt: "",
+    assistantDisabledAt: "",
+    status: "new",
+    awaitingField: null,
+    summary: "",
+    lastUserMessage: "",
+    lastAssistantReply: "",
+    lastModelResponseId: null,
+    lead: {
+      adultName: "",
+      studentName: "",
+      studentLevel: "",
+      studentAge: "",
+      subject: "",
+      modality: "",
+      notes: ""
+    },
+    history: [],
+    pendingReplies: {},
+    updatedAt: new Date().toISOString()
+  };
+}
+
 module.exports = {
   appendHistory,
   clearPendingReply,
@@ -319,6 +348,7 @@ module.exports = {
   loadConversation,
   markProcessedMessage,
   mergeLead,
+  resetAssistantConversation,
   saveConversation,
   setPendingReply
 };

@@ -26,3 +26,8 @@
   from = "/api/agent/book"
   to = "/.netlify/functions/agent-book"
   status = 200
+
+[[redirects]]
+  from = "/api/agent/reactivate"
+  to = "/.netlify/functions/agent-reactivate"
+  status = 200

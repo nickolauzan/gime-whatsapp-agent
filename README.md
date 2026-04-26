@@ -18,6 +18,7 @@ Se agrego una base serverless compatible con Netlify Functions para el agente de
 - `netlify/functions/agent-reply.js`: endpoint de prueba manual para generar respuestas.
 - `netlify/functions/agent-availability.js`: prueba manual de disponibilidad contra Google Calendar.
 - `netlify/functions/agent-book.js`: reserva manual de entrevista.
+- `netlify/functions/agent-reactivate.js`: reactiva manualmente un contacto desactivado.
 - `netlify/functions/lib/`: configuracion, agente, servicios y helpers.
 - `data/faq.json`: base de conocimiento inicial.
 - `.env.example`: variables de entorno necesarias.
@@ -29,6 +30,7 @@ Se agrego una base serverless compatible con Netlify Functions para el agente de
 - `/api/agent/reply`
 - `/api/agent/availability`
 - `/api/agent/book`
+- `/api/agent/reactivate`
 
 ## Variables de entorno
 
@@ -36,6 +38,7 @@ Definilas en Netlify:
 
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
+- `AGENT_ADMIN_TOKEN`
 - `META_VERIFY_TOKEN`
 - `WHATSAPP_ACCESS_TOKEN`
 - `WHATSAPP_PHONE_NUMBER_ID`
@@ -54,3 +57,4 @@ Definilas en Netlify:
 - Para usar Google Calendar con service account, comparte el calendario objetivo con el email de la cuenta de servicio y dale permiso para editar eventos.
 - La disponibilidad usa `freeBusy` sobre la ventana pedida y propone bloques segun duracion, dias y franjas horarias configuradas en `WORKDAY_WINDOWS` como `09:00-10:00,19:00-21:00`.
 - La reserva valida solapamientos y crea un evento real en Google Calendar.
+- Si un contacto pide salir del flujo automatico, queda desactivado para ese WhatsApp. Para reactivarlo, usa `POST /api/agent/reactivate` con header `x-admin-token: <AGENT_ADMIN_TOKEN>` y body `{"whatsapp_user_id":"54911..."}`.
