@@ -6,8 +6,9 @@ const CONTACT_CONFIG = {
   whatsappDisplay: "+54 9 11 2094-6319",
   email: "gimesoledadmendez@gmail.com",
   location: "Morón, Buenos Aires.",
-  scheduleUrl: "",
+  scheduleUrl: "https://cal.com/gimena-mendez/15min",
   whatsappQuestionsMessage: "",
+  // Fallback interno por si mas adelante se vuelve a usar WhatsApp para iniciar agenda.
   whatsappScheduleMessage:
     "Hola! Me gustaría agendar una entrevista para apoyo escolar",
 };
@@ -51,9 +52,10 @@ function bindLinks() {
 
   document.querySelectorAll("[data-schedule-link]").forEach((link) => {
     link.setAttribute("href", scheduleUrl);
-    if (!CONTACT_CONFIG.scheduleUrl && CONTACT_CONFIG.whatsappNumber) {
-      link.setAttribute("aria-label", "Agendar entrevista por WhatsApp");
-    }
+    link.setAttribute(
+      "aria-label",
+      CONTACT_CONFIG.scheduleUrl ? "Agendar entrevista en calendario" : "Agendar entrevista por WhatsApp",
+    );
   });
 
   document.querySelectorAll("[data-whatsapp-link]").forEach((link) => {
